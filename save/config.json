@@ -1,0 +1,59 @@
+{
+    "_comment": {
+        "check_interval_seconds": "재수집 시간 (초)",
+        "alert_cool_down_seconds": "팀즈 중복 발송 대기 시간 (초)"
+    },
+
+    "check_interval_seconds": 300,
+    "alert_cool_down_seconds": 1800,
+    "keyword_file": "keywords.json",
+    "regions": [
+        {
+            "name": "미국 주요 사업자",
+            "url": "https://downdetector.com/",
+            "limit": 7
+        },
+        {
+            "name": "일본 주요 사업자",
+            "url": "https://downdetector.jp/",
+            "limit": 7
+        }
+    ],
+    "fixed_targets": [
+        {
+            "name": "말레이시아 - Maxis",
+            "url": "https://downdetector.my/masalah/maxis/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "인도네시아 - Telkom",
+            "url": "https://downdetector.id/masalah/telkom-indonesia/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "캐나다 - Rogers",
+            "url": "https://downdetector.ca/status/rogers/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "태국 - AIS",
+            "url": "https://th.downdetector.com/sthaana/ais/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "프랑스 - Orange",
+            "url": "https://downdetector.fr/statut/orange/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "호주 - Optus",
+            "url": "https://downdetector.com.au/status/optus/",
+            "group": "주요 로밍 사업자"
+        },
+        {
+            "name": "필리핀 - Globe",
+            "url": "https://downdetector.ph/status/globe/",
+            "group": "주요 로밍 사업자"
+        }
+    ]
+}
