@@ -32,12 +32,28 @@ class MonitorEngine:
 
         try:
             co = ChromiumOptions()
+            
+            profile_path = os.path.join(os.getcwd(), "chrome_temp_profile")
+            co.set_user_data_path(profile_path)
+            
+            co.incognito()
+
             co.set_argument('--disable-extensions')
             co.set_argument('--disable-popup-blocking')
+            co.set_argument('--no-first-run')
+            co.set_argument('--no-default-browser-check')
+            co.set_argument('about:blank') # 빈 페이지로 시작
+
             co.auto_port()
-            
             self.page = ChromiumPage(co)
             
+            try:
+                if self.page.tabs_count > 1:
+                    self.page.close_other_tabs()
+                self.page.get('about:blank')
+            except Exception as e:
+                print(f"초기 탭 정리 중 오류 (무시 가능): {e}")
+
             try:
                 self.page.set.window.location(1600, 1000)
                 self.page.set.window.size(800, 600)
