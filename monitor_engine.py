@@ -36,7 +36,7 @@ class MonitorEngine:
             profile_path = os.path.join(os.getcwd(), "chrome_temp_profile")
             co.set_user_data_path(profile_path)
             
-            co.incognito()
+            #co.incognito() #시크릿 모드
 
             co.set_argument('--disable-extensions')
             co.set_argument('--disable-popup-blocking')
@@ -82,10 +82,11 @@ class MonitorEngine:
                 self.page = None
 
     def load_points(self):
-        """save/point.json에서 좌표를 읽어옴. 실패 시 기본값 반환"""
+        """save/point.json에서 좌표 및 대기 시간을 읽어옴. 실패 시 기본값 반환"""
         default_pts = {
             "click1": {"x": 535, "y": 375},
-            "click2": {"x": 535, "y": 425}
+            "click2": {"x": 535, "y": 425},
+            "wait_timeout": 5 # 기본값 5초 설정
         }
         
         pt_file = os.path.join("save", "point.json")
@@ -95,77 +96,104 @@ class MonitorEngine:
         try:
             with open(pt_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if "click1" in data and "click2" in data:
-                    return data
+                default_pts.update(data) # 기존 데이터에 안전하게 병합
                 return default_pts
         except:
             return default_pts
 
     def solve_cloudflare_gui(self):
-            """Cloudflare 물리 우회"""
-            try:
-                if not self.page: return False
+        """Cloudflare 하이브리드 우회 (1단계: 설정된 시간만큼 자동 대기 -> 2단계: 실패 시 물리 클릭)"""
+        try:
+            if not self.page: return False
 
+            # Cloudflare 특유의 타이틀 키워드
+            target_keywords = ["잠시만 기다리십시오", "Just a moment", "Cloudflare"]
+            current_title = self.page.title
+            
+            if not any(k in current_title for k in target_keywords):
+                return False
+
+            # [JSON 설정 로드]
+            points = self.load_points()
+            wait_timeout = points.get("wait_timeout", 5)
+
+            print(f"🚨 Cloudflare 감지됨 ({current_title}). 1단계: {wait_timeout}초간 자동 통과 대기 중...")
+
+            # ---------------------------------------------------------
+            # [1단계] 자동 통과 대기
+            # ---------------------------------------------------------
+            start_time = time.time()
+            while time.time() - start_time < wait_timeout:
                 current_title = self.page.title
-                target_keywords = ["잠시만 기다리십시오", "Just a moment"]
                 
                 if not any(k in current_title for k in target_keywords):
-                    return False
-
-                print(f"🚨 Cloudflare 감지됨 ({current_title}). 물리 우회 시도...")
-
-                target_win = None
-                all_titles = gw.getAllTitles()
-                
-                for t in all_titles:
-                    if ("잠시만 기다리십시오" in t or "Just a moment" in t) and "Chrome" in t:
-                        wins = gw.getWindowsWithTitle(t)
-                        if wins:
-                            target_win = wins[0]
-                            break
-                
-                if target_win:
-                    if target_win.isMinimized: target_win.restore()
-                    target_win.activate()
-                    time.sleep(1.5)
-                    target_win.maximize()
-                    time.sleep(2.5)
-                    
-                    # [좌표 파일 로드]
-                    points = self.load_points()
-                    c1 = points["click1"]
-                    c2 = points["click2"]
-
-                    print(f"   -> 체크박스 클릭 시도... ({c1['x']}, {c1['y']})")
-                    pyautogui.moveTo(c1['x'], c1['y'], duration=0.5) 
-                    pyautogui.click() 
-                    
-                    time.sleep(1.5) 
-
-                    print(f"   -> 체크박스 다른거 클릭 시도... ({c2['x']}, {c2['y']})")
-                    pyautogui.moveTo(c2['x'], c2['y'], duration=0.5) 
-                    pyautogui.click() 
-
-                    time.sleep(5.5) 
-
-                    target_win.restore()
-                    time.sleep(1.5)
-                    target_win.moveTo(1600, 1000)
-                    target_win.resizeTo(800, 600)
-                    
+                    print(f"✅ Cloudflare 자동 통과 완료! (소요 시간: {int(time.time() - start_time)}초)")
+                    time.sleep(2)
                     try:
                         if self.page.tabs_count > 1:
                             self.page.close_other_tabs() 
                     except:
                         pass
-
                     return True
-                else:
-                    return False
+                
+                time.sleep(1)
 
-            except Exception as e:
-                print(f"   -> [오류] GUI 우회 실패: {e}")
+            # ---------------------------------------------------------
+            # [2단계] 자동 통과 실패 시 물리 클릭(GUI) 시도
+            # ---------------------------------------------------------
+            print(f"⚠️ {wait_timeout}초 대기 초과. 2단계: 물리적 클릭 시도...")
+            
+            target_win = None
+            all_titles = gw.getAllTitles()
+            
+            for t in all_titles:
+                if any(k in t for k in target_keywords) and "Chrome" in t:
+                    wins = gw.getWindowsWithTitle(t)
+                    if wins:
+                        target_win = wins[0]
+                        break
+            
+            if target_win:
+                if target_win.isMinimized: target_win.restore()
+                target_win.activate()
+                time.sleep(1.5)
+                target_win.maximize()
+                time.sleep(2.5)
+                
+                c1 = points["click1"]
+                c2 = points["click2"]
+
+                print(f"   -> 체크박스 클릭 시도... ({c1['x']}, {c1['y']})")
+                pyautogui.moveTo(c1['x'], c1['y'], duration=0.5) 
+                pyautogui.click() 
+                
+                time.sleep(1.5) 
+
+                print(f"   -> 여백(다른 곳) 클릭 시도... ({c2['x']}, {c2['y']})")
+                pyautogui.moveTo(c2['x'], c2['y'], duration=0.5) 
+                pyautogui.click() 
+
+                time.sleep(5.5)
+
+                target_win.restore()
+                time.sleep(1.5)
+                target_win.moveTo(1600, 1000)
+                target_win.resizeTo(800, 600)
+                
+                try:
+                    if self.page.tabs_count > 1:
+                        self.page.close_other_tabs() 
+                except:
+                    pass
+
+                return True
+            else:
+                print("❌ [오류] 클릭할 Chrome 창을 찾지 못했습니다.")
                 return False
+
+        except Exception as e:
+            print(f"   -> [오류] 하이브리드 GUI 우회 실패: {e}")
+            return False
 
     def scan_and_check(self, regions, keyword_filename, fixed_targets=[], stop_event=None):
         final_results = []
