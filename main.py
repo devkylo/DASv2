@@ -128,17 +128,16 @@ class DASApp(tk.Tk):
             }
 
     def check_point_file(self):
-        """좌표 파일이 없으면 기본값으로 생성"""
         if not os.path.exists(POINT_FILE):
             default_points = {
                 "click1": {"x": 535, "y": 375},
-                "click2": {"x": 535, "y": 425}
+                "click2": {"x": 535, "y": 425},
+                "wait_timeout": 5
             }
             try:
                 save_dir = os.path.dirname(POINT_FILE)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                    
                 with open(POINT_FILE, 'w', encoding='utf-8') as f:
                     json.dump(default_points, f, indent=4)
             except: pass
@@ -175,7 +174,7 @@ class DASApp(tk.Tk):
         
         tk.Frame(btn_frame, width=15, bg=COLOR_HEADER).pack(side="left")
         
-        mk_btn(btn_frame, "좌표 설정", self.open_point_popup, "#444", width=9)
+        mk_btn(btn_frame, "우회 설정", self.open_point_popup, "#444", width=9)
         mk_btn(btn_frame, "키워드 설정", self.open_keyword_popup, "#444", width=9)
         mk_btn(btn_frame, "시스템 설정", self.open_config_popup, "#444", width=9)
         mk_btn(btn_frame, "종료", self.quit_app, COLOR_DANGER, width=9)
@@ -362,29 +361,30 @@ class DASApp(tk.Tk):
         tk.Button(btn_frame, text="저장", command=save_content, bg=COLOR_SUCCESS, fg="white", width=10, font=("Malgun Gothic", 10)).pack(side="right", padx=5)
 
     # =========================================================================
-    # 좌표 설정 팝업 기능
+    # 좌표 및 대기 시간 설정 팝업 기능
     # =========================================================================
     def open_point_popup(self):
         popup = tk.Toplevel(self)
-        popup.title("로봇 우회 좌표 설정")
-        popup.geometry("450x300")
+        popup.title("로봇 우회 상세 설정")
+        popup.geometry("450x350") # 입력 칸이 늘어나서 창 높이 증가
         popup.configure(bg=COLOR_HEADER)
         
-        current_data = {"click1": {"x": 535, "y": 375}, "click2": {"x": 535, "y": 425}}
+        current_data = {"click1": {"x": 535, "y": 375}, "click2": {"x": 535, "y": 425}, "wait_timeout": 5}
         try:
             if os.path.exists(POINT_FILE):
                 with open(POINT_FILE, 'r', encoding='utf-8') as f:
-                    current_data = json.load(f)
+                    saved_data = json.load(f)
+                    current_data.update(saved_data) # 기존 데이터에 덮어쓰기 (하위 호환)
         except: pass
 
-        tk.Label(popup, text="로봇 우회 클릭 좌표 설정", fg="white", bg=COLOR_HEADER, font=("Malgun Gothic", 14, "bold")).pack(pady=20)
+        tk.Label(popup, text="로봇 우회 물리 클릭 & 대기 설정", fg="white", bg=COLOR_HEADER, font=("Malgun Gothic", 14, "bold")).pack(pady=15)
 
         input_frame = tk.Frame(popup, bg=COLOR_HEADER)
-        input_frame.pack(pady=10)
+        input_frame.pack(pady=5)
 
         entries = {}
         def create_entry_row(row, label_text, key_prefix):
-            tk.Label(input_frame, text=label_text, fg="#CCC", bg=COLOR_HEADER, font=("Malgun Gothic", 11)).grid(row=row, column=0, columnspan=2, pady=(10, 5))
+            tk.Label(input_frame, text=label_text, fg="#CCC", bg=COLOR_HEADER, font=("Malgun Gothic", 11)).grid(row=row, column=0, columnspan=4, pady=(10, 5))
             
             tk.Label(input_frame, text="X:", fg="white", bg=COLOR_HEADER).grid(row=row+1, column=0, padx=5)
             e_x = tk.Entry(input_frame, width=8, bg="#333", fg="white", insertbackground="white")
@@ -401,6 +401,13 @@ class DASApp(tk.Tk):
         create_entry_row(0, "1차 시도 클릭 좌표", "click1")
         create_entry_row(2, "2차 시도 클릭 좌표", "click2")
 
+        # --- 대기 시간 입력 UI 추가 ---
+        tk.Label(input_frame, text="자동 대기 시간 (초):", fg="#CCC", bg=COLOR_HEADER, font=("Malgun Gothic", 11)).grid(row=4, column=0, columnspan=2, pady=(20, 5), sticky="e")
+        e_timeout = tk.Entry(input_frame, width=8, bg="#333", fg="white", insertbackground="white")
+        e_timeout.insert(0, str(current_data.get("wait_timeout", 5)))
+        e_timeout.grid(row=4, column=2, columnspan=2, pady=(20, 5), sticky="w")
+        entries["wait_timeout"] = e_timeout
+
         def save_points():
             try:
                 new_data = {
@@ -411,7 +418,8 @@ class DASApp(tk.Tk):
                     "click2": {
                         "x": int(entries["click2_x"].get()),
                         "y": int(entries["click2_y"].get())
-                    }
+                    },
+                    "wait_timeout": int(entries["wait_timeout"].get()) # 대기 시간 저장
                 }
                 save_dir = os.path.dirname(POINT_FILE)
                 if not os.path.exists(save_dir): os.makedirs(save_dir)
@@ -419,15 +427,15 @@ class DASApp(tk.Tk):
                 with open(POINT_FILE, 'w', encoding='utf-8') as f:
                     json.dump(new_data, f, indent=4)
                 
-                messagebox.showinfo("저장", "좌표가 저장되었습니다.\n다음 수집부터 적용됩니다.")
+                messagebox.showinfo("저장", "설정이 저장되었습니다.\n다음 수집부터 적용됩니다.")
                 popup.destroy()
             except ValueError:
-                messagebox.showerror("오류", "좌표값은 숫자만 입력해주세요.")
+                messagebox.showerror("오류", "좌표 및 시간 값은 숫자만 입력해주세요.")
             except Exception as e:
                 messagebox.showerror("오류", str(e))
 
         btn_frame = tk.Frame(popup, bg=COLOR_HEADER)
-        btn_frame.pack(fill="x", pady=20, padx=20)
+        btn_frame.pack(fill="x", pady=15, padx=20)
         tk.Button(btn_frame, text="취소", command=popup.destroy, bg="#555", fg="white", width=10).pack(side="right", padx=5)
         tk.Button(btn_frame, text="저장", command=save_points, bg=COLOR_SUCCESS, fg="white", width=10).pack(side="right", padx=5)
 
